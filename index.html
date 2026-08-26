@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My単語帳</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 20px auto; color: #333; }
+        
+        .form-container { padding: 15px; border: 2px solid #333; border-radius: 8px; margin-bottom: 10px; }
+        .form-container input { display: block; width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
+        .add-btn { background-color: #4CAF50; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; }
+        
+        .checkbox-container { display: flex; gap: 15px; margin-bottom: 20px; padding: 10px; background: #f0f0f0; border-radius: 8px; flex-wrap: wrap; }
+        .checkbox-container label { cursor: pointer; font-size: 14px; }
+        
+        .word-card { border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; border-radius: 8px; background: #f9f9f9; }
+        .word-card h3 { margin: 0 0 10px 0; color: #222; }
+        .word-card p { margin: 5px 0; font-size: 14px; }
+        
+        .card-actions { display: flex; justify-content: space-between; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 10px; }
+        
+        .delete-btn { background-color: #ff4d4d; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+        .toggle-btn { background-color: #2196F3; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <h2>マイ単語帳</h2>
+
+    <div class="form-container">
+        <input type="text" id="wordInput" placeholder="単語 (例: apple)">
+        <input type="text" id="meaningInput" placeholder="意味 (例: りんご)">
+        <input type="text" id="exampleInput" placeholder="例文 (例: I eat an apple.)">
+        <input type="text" id="translationInput" placeholder="例文の訳 (例: 私はりんごを食べる。)">
+        <button class="add-btn" onclick="addWord()">単語を追加</button>
+    </div>
+
+    <!-- チェックボックスが変わった時も保存処理(saveData)を呼ぶように変更 -->
+    <div class="checkbox-container">
+        <strong>全体表示設定:</strong>
+        <label><input type="checkbox" id="checkWord" checked onchange="handleCheckboxChange()"> 単語</label>
+        <label><input type="checkbox" id="checkMeaning" checked onchange="handleCheckboxChange()"> 意味</label>
+        <label><input type="checkbox" id="checkExample" checked onchange="handleCheckboxChange()"> 例文</label>
+        <label><input type="checkbox" id="checkTranslation" checked onchange="handleCheckboxChange()"> 訳</label>
+    </div>
+
+    <div id="wordList"></div>
+
+    <script>
+        let words = [];
+
+        // ページが読み込まれた時にデータを復元する
+        window.onload = function() {
+            loadData();
+        };
+
+        // --- データの保存と読み込み ---
+
+        function saveData() {
+            // 単語配列をテキスト(JSON)に変換して保存
+            localStorage.setItem('myWordsData', JSON.stringify(words));
+
+            // チェックボックスの状態も一緒に保存
+            const checkStates = {
+                word: document.getElementById('checkWord').checked,
+                meaning: document.getElementById('checkMeaning').checked,
+                example: document.getElementById('checkExample').checked,
+                translation: document.getElementById('checkTranslation').checked
+            };
+            localStorage.setItem('myCheckStates', JSON.stringify(checkStates));
+        }
+
+        function loadData() {
+            // 単語データの読み込み
+            const storedWords = localStorage.getItem('myWordsData');
+            if (storedWords) {
+                words = JSON.parse(storedWords); // テキスト(JSON)を配列に戻す
+            }
+
+            // チェックボックス状態の読み込み
+            const storedChecks = localStorage.getItem('myCheckStates');
+            if (storedChecks) {
+                const checkStates = JSON.parse(storedChecks);
+                document.getElementById('checkWord').checked = checkStates.word;
+                document.getElementById('checkMeaning').checked = checkStates.meaning;
+                document.getElementById('checkExample').checked = checkStates.example;
+                document.getElementById('checkTranslation').checked = checkStates.translation;
+            }
+
+            renderWords();
+        }
+
+        // --- アクション ---
+
+        function addWord() {
+            const word = document.getElementById('wordInput').value;
+            const meaning = document.getElementById('meaningInput').value;
+            const example = document.getElementById('exampleInput').value;
+            const translation = document.getElementById('translationInput').value;
+
+            if (!word || !meaning) {
+                alert("単語と意味は入力してください！");
+                return;
+            }
+
+            words.push({ word, meaning, example, translation, showAll: false });
+            
+            document.getElementById('wordInput').value = '';
+            document.getElementById('meaningInput').value = '';
+            document.getElementById('exampleInput').value = '';
+            document.getElementById('translationInput').value = '';
+
+            saveData(); // データが変わったので保存
+            renderWords();
+        }
+
+        function deleteWord(index) {
+            words.splice(index, 1);
+            saveData(); // データが変わったので保存
+            renderWords();
+        }
+
+        function toggleShowAll(index) {
+            words[index].showAll = !words[index].showAll;
+            saveData(); // データが変わったので保存
+            renderWords();
+        }
+
+        function handleCheckboxChange() {
+            saveData(); // チェック状態が変わったので保存
+            renderWords();
+        }
+
+        // --- 画面の描画 ---
+
+        function renderWords() {
+            const list = document.getElementById('wordList');
+            list.innerHTML = ''; 
+
+            const showWordGlobal = document.getElementById('checkWord').checked;
+            const showMeaningGlobal = document.getElementById('checkMeaning').checked;
+            const showExampleGlobal = document.getElementById('checkExample').checked;
+            const showTranslationGlobal = document.getElementById('checkTranslation').checked;
+
+            words.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.className = 'word-card';
+                
+                const displayWord = item.showAll || showWordGlobal;
+                const displayMeaning = item.showAll || showMeaningGlobal;
+                const displayExample = item.showAll || showExampleGlobal;
+                const displayTranslation = item.showAll || showTranslationGlobal;
+
+                let contentHTML = '';
+                if (displayWord) contentHTML += `<h3>${item.word}</h3>`;
+                if (displayMeaning) contentHTML += `<p><strong>意味:</strong> ${item.meaning}</p>`;
+                if (displayExample) contentHTML += `<p><strong>例文:</strong> ${item.example}</p>`;
+                if (displayTranslation) contentHTML += `<p><strong>訳:</strong> ${item.translation}</p>`;
+                
+                if (!displayWord && !displayMeaning && !displayExample && !displayTranslation) {
+                    contentHTML = `<p style="color:#999; font-style:italic;">すべて非表示になっています</p>`;
+                }
+
+                const buttonText = item.showAll ? '非表示' : '表示';
+                const actionsHTML = `
+                    <div class="card-actions">
+                        <button class="toggle-btn" onclick="toggleShowAll(${index})">${buttonText}</button>
+                        <button class="delete-btn" onclick="deleteWord(${index})">削除</button>
+                    </div>
+                `;
+
+                card.innerHTML = contentHTML + actionsHTML;
+                list.appendChild(card);
+            });
+        }
+    </script>
+</body>
+</html>
