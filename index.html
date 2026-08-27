@@ -7,7 +7,6 @@
     <style>
         body { font-family: sans-serif; max-width: 600px; margin: 20px auto; color: #333; }
         
-        /* 単語帳管理エリアのスタイル */
         .deck-container { padding: 15px; border: 2px solid #2196F3; border-radius: 8px; margin-bottom: 20px; background: #e3f2fd; }
         .deck-container select { width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box; font-size: 16px;}
         .deck-actions { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -15,7 +14,6 @@
         .deck-actions button { background-color: #2196F3; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; white-space: nowrap; }
         .deck-delete-btn { background-color: #ff9800; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; width: 100%; font-size: 14px;}
 
-        /* 入力フォーム周辺のスタイル */
         .form-container { padding: 15px; border: 2px solid #333; border-radius: 8px; margin-bottom: 10px; }
         .form-container input { display: block; width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
         #addBtn { background-color: #4CAF50; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; }
@@ -27,8 +25,12 @@
         .word-card h3 { margin: 0 0 10px 0; color: #222; }
         .word-card p { margin: 5px 0; font-size: 14px; }
         
-        .card-actions { display: flex; justify-content: space-between; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 10px; }
+        .card-actions { display: flex; justify-content: space-between; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 10px; align-items: center; }
         .action-right { display: flex; gap: 8px; }
+
+        /* 新設：移動用ドロップダウンのスタイル */
+        .move-deck-container { font-size: 12px; color: #555; }
+        .move-deck-container select { padding: 4px; font-size: 12px; border-radius: 4px; }
 
         .toggle-btn { background-color: #2196F3; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
         .edit-btn { background-color: #ffc107; color: #333; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
@@ -39,7 +41,6 @@
 
     <h2>マイ単語帳</h2>
 
-    <!-- 新設：単語帳の切り替え・作成エリア -->
     <div class="deck-container">
         <label for="deckSelect"><strong>現在の単語帳:</strong></label>
         <select id="deckSelect" onchange="changeDeck()"></select>
@@ -51,7 +52,6 @@
         <button class="deck-delete-btn" onclick="deleteCurrentDeck()">現在の単語帳を削除</button>
     </div>
 
-    <!-- 単語の追加・編集エリア -->
     <div class="form-container">
         <input type="text" id="wordInput" placeholder="単語 (例: apple)">
         <input type="text" id="meaningInput" placeholder="意味 (例: りんご)">
@@ -60,7 +60,6 @@
         <button id="addBtn" onclick="addOrUpdateWord()">単語を追加</button>
     </div>
 
-    <!-- 表示切り替えエリア -->
     <div class="checkbox-container">
         <strong>全体表示設定:</strong>
         <label><input type="checkbox" id="checkWord" checked onchange="handleCheckboxChange()"> 単語</label>
@@ -72,7 +71,6 @@
     <div id="wordList"></div>
 
     <script>
-        // データ構造を変更。複数の単語帳（デッキ）を管理します。
         let decks = {
             "メイン": []
         };
@@ -84,9 +82,7 @@
         };
 
         function saveData() {
-            // 単語帳全体のデータを保存
             localStorage.setItem('myDecksData', JSON.stringify(decks));
-            // 最後に開いていた単語帳の名前を保存
             localStorage.setItem('currentDeckName', currentDeck);
             
             const checkStates = {
@@ -105,14 +101,12 @@
                 decks = JSON.parse(storedDecks);
                 currentDeck = localStorage.getItem('currentDeckName') || Object.keys(decks)[0];
             } else {
-                // ★重要: 古いバージョンのアプリで作ったデータがあれば「メイン」に引き継ぐ処理
                 const oldWords = localStorage.getItem('myWordsData');
                 if (oldWords) {
                     decks["メイン"] = JSON.parse(oldWords);
                 }
             }
 
-            // もし何らかの理由で現在のデッキが存在しない場合は、最初のデッキを選ぶ
             if (!decks[currentDeck]) {
                 currentDeck = Object.keys(decks)[0];
             }
@@ -130,15 +124,16 @@
             renderWords();
         }
 
-        // --- 単語帳（デッキ）管理の機能 ---
+        // --- 単語帳（デッキ）管理 ---
 
         function renderDeckSelect() {
             const select = document.getElementById('deckSelect');
             select.innerHTML = '';
             for (let deckName in decks) {
+                const wordCount = decks[deckName].length; // ★単語数を取得
                 const option = document.createElement('option');
                 option.value = deckName;
-                option.innerText = deckName;
+                option.innerText = `${deckName} (${wordCount}語)`; // ★名前の横に単語数を表示
                 if (deckName === currentDeck) {
                     option.selected = true;
                 }
@@ -165,9 +160,8 @@
                 return;
             }
             
-            // 新しい空の配列を作る
             decks[newDeckName] = [];
-            currentDeck = newDeckName; // 作成した単語帳にすぐ切り替える
+            currentDeck = newDeckName;
             
             document.getElementById('newDeckInput').value = '';
             editIndex = -1;
@@ -184,7 +178,7 @@
             }
             if (confirm(`本当に単語帳「${currentDeck}」を削除しますか？\n中の単語もすべて消えます！`)) {
                 delete decks[currentDeck];
-                currentDeck = Object.keys(decks)[0]; // 残っている一番上の単語帳に移動
+                currentDeck = Object.keys(decks)[0];
                 editIndex = -1;
                 clearInputs();
                 saveData();
@@ -201,7 +195,7 @@
             document.getElementById('addBtn').innerText = '単語を追加';
         }
 
-        // --- 単語の操作機能（現在のデッキに対して処理するよう変更） ---
+        // --- 単語の操作機能 ---
 
         function addOrUpdateWord() {
             const word = document.getElementById('wordInput').value;
@@ -215,7 +209,6 @@
             }
 
             if (editIndex === -1) {
-                // decks[currentDeck]（今選んでいる単語帳）に追加する
                 decks[currentDeck].push({ word, meaning, example, translation, showAll: false });
             } else {
                 decks[currentDeck][editIndex].word = word;
@@ -227,6 +220,7 @@
             
             clearInputs();
             saveData();
+            renderDeckSelect(); // ★追加時に件数を更新
             renderWords();
         }
 
@@ -244,7 +238,34 @@
         function deleteWord(index) {
             decks[currentDeck].splice(index, 1);
             saveData();
+            renderDeckSelect(); // ★削除時に件数を更新
             renderWords();
+        }
+
+        // ★新設：別の単語帳に移動する機能
+        function moveWord(index, targetDeck) {
+            if (targetDeck === currentDeck) return; // 同じ単語帳なら何もしない
+
+            // 移動する単語のデータをコピー
+            const wordToMove = decks[currentDeck][index];
+            
+            // 現在の単語帳から削除
+            decks[currentDeck].splice(index, 1);
+            
+            // 目的の単語帳に追加
+            decks[targetDeck].push(wordToMove);
+
+            // もし編集中の単語を移動させてしまった場合は、入力欄をリセットして安全対策
+            if (editIndex === index) {
+                editIndex = -1;
+                clearInputs();
+            } else if (editIndex > index) {
+                editIndex--; // 削除されたことで番号がズレるのを修正
+            }
+
+            saveData();
+            renderDeckSelect(); // 件数の更新
+            renderWords(); // 画面の再描画
         }
 
         function toggleShowAll(index) {
@@ -267,7 +288,6 @@
             const showExampleGlobal = document.getElementById('checkExample').checked;
             const showTranslationGlobal = document.getElementById('checkTranslation').checked;
 
-            // decks[currentDeck] の中身だけをループして表示
             decks[currentDeck].forEach((item, index) => {
                 const card = document.createElement('div');
                 card.className = 'word-card';
@@ -288,9 +308,25 @@
                 }
 
                 const buttonText = item.showAll ? '非表示' : '表示';
+                
+                // ★カード内に他の単語帳のリストを作成してドロップダウン（<select>）にする
+                let moveOptionsHTML = '';
+                for (let dName in decks) {
+                    const isSelected = (dName === currentDeck) ? 'selected' : '';
+                    moveOptionsHTML += `<option value="${dName}" ${isSelected}>${dName}へ移動</option>`;
+                }
+                
                 const actionsHTML = `
                     <div class="card-actions">
                         <button class="toggle-btn" onclick="toggleShowAll(${index})">${buttonText}</button>
+                        
+                        <!-- ★ここに移動用のドロップダウンを追加 -->
+                        <div class="move-deck-container">
+                            <select onchange="moveWord(${index}, this.value)">
+                                ${moveOptionsHTML}
+                            </select>
+                        </div>
+
                         <div class="action-right">
                             <button class="edit-btn" onclick="editWord(${index})">編集</button>
                             <button class="delete-btn" onclick="deleteWord(${index})">削除</button>
