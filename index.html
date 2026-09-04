@@ -15,11 +15,17 @@
         .deck-delete-btn { background-color: #ff9800; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; width: 100%; font-size: 14px;}
 
         .form-container { padding: 15px; border: 2px solid #333; border-radius: 8px; margin-bottom: 10px; }
-        .form-container input { display: block; width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
-        #addBtn { background-color: #4CAF50; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; }
+        .form-container input, .form-container textarea { display: block; width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; font-family: monospace; }
+        .form-container hr { border: none; border-top: 1px dashed #ccc; margin: 20px 0; }
         
-        .checkbox-container { display: flex; gap: 15px; margin-bottom: 20px; padding: 10px; background: #f0f0f0; border-radius: 8px; flex-wrap: wrap; }
+        #addBtn { background-color: #4CAF50; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; }
+        .json-btn { background-color: #9c27b0; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; }
+        
+        .checkbox-container { display: flex; gap: 15px; margin-bottom: 10px; padding: 10px; background: #f0f0f0; border-radius: 8px; flex-wrap: wrap; }
         .checkbox-container label { cursor: pointer; font-size: 14px; }
+        
+        .sort-container { display: flex; gap: 10px; margin-bottom: 20px; }
+        .sort-btn { flex: 1; background-color: #607d8b; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         
         .word-card { border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; border-radius: 8px; background: #f9f9f9; }
         .word-card h3 { margin: 0 0 10px 0; color: #222; }
@@ -28,13 +34,14 @@
         .card-actions { display: flex; justify-content: space-between; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 10px; align-items: center; }
         .action-right { display: flex; gap: 8px; }
 
-        /* 新設：移動用ドロップダウンのスタイル */
         .move-deck-container { font-size: 12px; color: #555; }
         .move-deck-container select { padding: 4px; font-size: 12px; border-radius: 4px; }
 
         .toggle-btn { background-color: #2196F3; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
         .edit-btn { background-color: #ffc107; color: #333; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .delete-btn { background-color: #ff4d4d; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+        
+        .highlight-word { color: #2196F3; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -58,6 +65,20 @@
         <input type="text" id="exampleInput" placeholder="例文 (例: I eat an apple.)">
         <input type="text" id="translationInput" placeholder="例文の訳 (例: 私はりんごを食べる。)">
         <button id="addBtn" onclick="addOrUpdateWord()">単語を追加</button>
+        
+        <hr>
+        
+        <!-- ★新設：JSON入力エリア -->
+        <h4 style="margin-top: 0;">一括追加 (JSON形式)</h4>
+        <textarea id="jsonInput" rows="5" placeholder='[
+  {
+    "word": "apple",
+    "meaning": "りんご",
+    "example": "I eat an apple.",
+    "translation": "私はりんごを食べる。"
+  }
+]'></textarea>
+        <button class="json-btn" onclick="addWordsFromJSON()">JSONから一気に追加</button>
     </div>
 
     <div class="checkbox-container">
@@ -66,6 +87,11 @@
         <label><input type="checkbox" id="checkMeaning" checked onchange="handleCheckboxChange()"> 意味</label>
         <label><input type="checkbox" id="checkExample" checked onchange="handleCheckboxChange()"> 例文</label>
         <label><input type="checkbox" id="checkTranslation" checked onchange="handleCheckboxChange()"> 訳</label>
+    </div>
+
+    <div class="sort-container">
+        <button class="sort-btn" onclick="shuffleDeck()">🔀 シャッフル</button>
+        <button class="sort-btn" onclick="sortDeck()">⬇️ 辞書順に並べ替え</button>
     </div>
 
     <div id="wordList"></div>
@@ -96,7 +122,6 @@
 
         function loadData() {
             const storedDecks = localStorage.getItem('myDecksData');
-            
             if (storedDecks) {
                 decks = JSON.parse(storedDecks);
                 currentDeck = localStorage.getItem('currentDeckName') || Object.keys(decks)[0];
@@ -124,16 +149,14 @@
             renderWords();
         }
 
-        // --- 単語帳（デッキ）管理 ---
-
         function renderDeckSelect() {
             const select = document.getElementById('deckSelect');
             select.innerHTML = '';
             for (let deckName in decks) {
-                const wordCount = decks[deckName].length; // ★単語数を取得
+                const wordCount = decks[deckName].length;
                 const option = document.createElement('option');
                 option.value = deckName;
-                option.innerText = `${deckName} (${wordCount}語)`; // ★名前の横に単語数を表示
+                option.innerText = `${deckName} (${wordCount}語)`;
                 if (deckName === currentDeck) {
                     option.selected = true;
                 }
@@ -143,8 +166,7 @@
 
         function changeDeck() {
             currentDeck = document.getElementById('deckSelect').value;
-            editIndex = -1;
-            clearInputs();
+            cancelEdit();
             saveData();
             renderWords();
         }
@@ -164,8 +186,7 @@
             currentDeck = newDeckName;
             
             document.getElementById('newDeckInput').value = '';
-            editIndex = -1;
-            clearInputs();
+            cancelEdit();
             saveData();
             renderDeckSelect();
             renderWords();
@@ -179,8 +200,7 @@
             if (confirm(`本当に単語帳「${currentDeck}」を削除しますか？\n中の単語もすべて消えます！`)) {
                 delete decks[currentDeck];
                 currentDeck = Object.keys(decks)[0];
-                editIndex = -1;
-                clearInputs();
+                cancelEdit();
                 saveData();
                 renderDeckSelect();
                 renderWords();
@@ -195,7 +215,12 @@
             document.getElementById('addBtn').innerText = '単語を追加';
         }
 
-        // --- 単語の操作機能 ---
+        function cancelEdit() {
+            if (editIndex !== -1) {
+                editIndex = -1;
+                clearInputs();
+            }
+        }
 
         function addOrUpdateWord() {
             const word = document.getElementById('wordInput').value;
@@ -220,8 +245,60 @@
             
             clearInputs();
             saveData();
-            renderDeckSelect(); // ★追加時に件数を更新
+            renderDeckSelect();
             renderWords();
+        }
+
+        // ★新設：JSONから一括追加する機能
+        function addWordsFromJSON() {
+            const jsonText = document.getElementById('jsonInput').value.trim();
+            if (!jsonText) {
+                alert("JSONデータを入力してください！");
+                return;
+            }
+
+            try {
+                // 文字列をプログラム用のデータ(配列)に変換
+                const parsedData = JSON.parse(jsonText);
+                
+                // 配列かどうかをチェック
+                if (!Array.isArray(parsedData)) {
+                    alert("データは配列（[ ] で囲まれた形式）である必要があります！");
+                    return;
+                }
+
+                let addedCount = 0;
+                
+                // 配列の中身を1つずつチェックして単語帳に追加
+                parsedData.forEach(item => {
+                    // 最低限「word」と「meaning」が入っているか確認
+                    if (item.word && item.meaning) {
+                        decks[currentDeck].push({
+                            word: item.word,
+                            meaning: item.meaning,
+                            // exampleやtranslationが無い場合は空文字にする
+                            example: item.example || "",
+                            translation: item.translation || "",
+                            showAll: false
+                        });
+                        addedCount++;
+                    }
+                });
+
+                if (addedCount > 0) {
+                    alert(`${addedCount}件の単語を追加しました！`);
+                    document.getElementById('jsonInput').value = ''; // 成功したら入力欄を空にする
+                    cancelEdit();
+                    saveData();
+                    renderDeckSelect();
+                    renderWords();
+                } else {
+                    alert("有効な単語データ（wordとmeaningを含む）が見つかりませんでした。");
+                }
+            } catch (error) {
+                // JSONの構文エラー（カンマの付け忘れなど）を検知
+                alert("JSONの形式が間違っています。\n記号の抜け漏れがないか確認してください！\n詳細: " + error.message);
+            }
         }
 
         function editWord(index) {
@@ -238,34 +315,44 @@
         function deleteWord(index) {
             decks[currentDeck].splice(index, 1);
             saveData();
-            renderDeckSelect(); // ★削除時に件数を更新
+            renderDeckSelect();
             renderWords();
         }
 
-        // ★新設：別の単語帳に移動する機能
         function moveWord(index, targetDeck) {
-            if (targetDeck === currentDeck) return; // 同じ単語帳なら何もしない
+            if (targetDeck === currentDeck) return;
 
-            // 移動する単語のデータをコピー
             const wordToMove = decks[currentDeck][index];
-            
-            // 現在の単語帳から削除
             decks[currentDeck].splice(index, 1);
-            
-            // 目的の単語帳に追加
             decks[targetDeck].push(wordToMove);
 
-            // もし編集中の単語を移動させてしまった場合は、入力欄をリセットして安全対策
             if (editIndex === index) {
-                editIndex = -1;
-                clearInputs();
+                cancelEdit();
             } else if (editIndex > index) {
-                editIndex--; // 削除されたことで番号がズレるのを修正
+                editIndex--;
             }
 
             saveData();
-            renderDeckSelect(); // 件数の更新
-            renderWords(); // 画面の再描画
+            renderDeckSelect();
+            renderWords();
+        }
+
+        function shuffleDeck() {
+            const deck = decks[currentDeck];
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+            cancelEdit();
+            saveData();
+            renderWords();
+        }
+
+        function sortDeck() {
+            decks[currentDeck].sort((a, b) => a.word.toLowerCase().localeCompare(b.word.toLowerCase()));
+            cancelEdit();
+            saveData();
+            renderWords();
         }
 
         function toggleShowAll(index) {
@@ -297,10 +384,16 @@
                 const displayExample = item.showAll || showExampleGlobal;
                 const displayTranslation = item.showAll || showTranslationGlobal;
 
+                let highlightedExample = item.example;
+                if (item.word && item.example) {
+                    const regex = new RegExp(`(${item.word})`, 'gi');
+                    highlightedExample = item.example.replace(regex, '<span class="highlight-word">$1</span>');
+                }
+
                 let contentHTML = '';
                 if (displayWord) contentHTML += `<h3>${item.word}</h3>`;
                 if (displayMeaning) contentHTML += `<p><strong>意味:</strong> ${item.meaning}</p>`;
-                if (displayExample) contentHTML += `<p><strong>例文:</strong> ${item.example}</p>`;
+                if (displayExample) contentHTML += `<p><strong>例文:</strong> ${highlightedExample}</p>`;
                 if (displayTranslation) contentHTML += `<p><strong>訳:</strong> ${item.translation}</p>`;
                 
                 if (!displayWord && !displayMeaning && !displayExample && !displayTranslation) {
@@ -309,7 +402,6 @@
 
                 const buttonText = item.showAll ? '非表示' : '表示';
                 
-                // ★カード内に他の単語帳のリストを作成してドロップダウン（<select>）にする
                 let moveOptionsHTML = '';
                 for (let dName in decks) {
                     const isSelected = (dName === currentDeck) ? 'selected' : '';
@@ -320,7 +412,6 @@
                     <div class="card-actions">
                         <button class="toggle-btn" onclick="toggleShowAll(${index})">${buttonText}</button>
                         
-                        <!-- ★ここに移動用のドロップダウンを追加 -->
                         <div class="move-deck-container">
                             <select onchange="moveWord(${index}, this.value)">
                                 ${moveOptionsHTML}
